@@ -22,6 +22,8 @@
   http://www.arduino.cc/en/Tutorial/Blink
 */
 
+#include <esp_task_wdt.h>
+
 
 TaskHandle_t Task1;
 TaskHandle_t Task2;
@@ -38,8 +40,13 @@ TaskHandle_t Task2;
 #define VFD_SI 36 // G8-G1 G-Element Seven-Segment Portion
 #define VFD_SJ 37 // 
 #define VFD_SK 5  // 
-#define VFD_SL 14 // 
+#define VFD_SL 14 //
 
+#define VFD_DATIN  36
+#define VFD_PE     25
+#define VFD_CLK    33
+#define VFD_CLKINH 26
+#define VFD_CLR    34
 
 #define VFD_G1 4
 #define VFD_G2 13
@@ -75,7 +82,27 @@ uint16_t n=number;
    Serial.println(binstr);
 }
 
+// Leaves clock line high to sync with shiftin function
+void CIPULSE(){ 
+    digitalWrite(VFD_CLK, LOW); // makes input clock low state
+    digitalWrite(VFD_CLK, HIGH); // makes input clock low state
+  
+}
 
+bool pinStateCheck(uint32_t GPIO_IN_REG_VAL, uint32_t GPIO_IN1_REG_VAL, uint8_t pinCheck){
+
+if (pinCheck < 32){
+ if ( (GPIO_IN_REG_VAL >> pinCheck) & (uint32_t)1  != 0) 
+ 
+  return true; }
+else{ 
+ if ( ((GPIO_IN1_REG_VAL >> (pinCheck - 32)) & (uint32_t)1 ) != 0) 
+   
+  return true; }
+ 
+return false;
+  
+}
 
 uint16_t vfdChar[8] = {0,0,0,0,0,0,0,0};
 
@@ -86,12 +113,32 @@ void IRAM_ATTR screenCapture(){
 
   uint8_t  gridPins = 0;
   uint16_t segPins = 0;
+  uint16_t tempSegPins = 0;
   uint64_t allPins = 0;
 
 if (!vfdFlag){
   uint32_t GPIO_IN_REG_VAL  = REG_READ(GPIO_IN_REG) ;
   uint32_t GPIO_IN1_REG_VAL = REG_READ(GPIO_IN1_REG) ;
 
+digitalWrite(VFD_CLKINH, LOW);
+digitalWrite(VFD_CLR,HIGH);
+digitalWrite(VFD_CLR,LOW);
+delay(1);
+
+
+digitalWrite(VFD_CLR,HIGH);
+CIPULSE();
+CIPULSE();
+CIPULSE();
+CIPULSE();
+CIPULSE();
+CIPULSE();
+CIPULSE();
+CIPULSE();
+delay(1);
+digitalWrite(VFD_PE, LOW);
+
+digitalWrite(VFD_CLKINH, HIGH);
 
 if ( pinStateCheck(GPIO_IN_REG_VAL,GPIO_IN1_REG_VAL, VFD_G1) ) gridPins |= 0b0000000000001 ;
 if ( pinStateCheck(GPIO_IN_REG_VAL,GPIO_IN1_REG_VAL, VFD_G2) ) gridPins |= 0b0000000000010 ;
@@ -102,6 +149,8 @@ if ( pinStateCheck(GPIO_IN_REG_VAL,GPIO_IN1_REG_VAL, VFD_G6) ) gridPins |= 0b000
 if ( pinStateCheck(GPIO_IN_REG_VAL,GPIO_IN1_REG_VAL, VFD_G7) ) gridPins |= 0b0000001000000 ;
 if ( pinStateCheck(GPIO_IN_REG_VAL,GPIO_IN1_REG_VAL, VFD_G8) ) gridPins |= 0b0000010000000 ;  
 
+
+/*
 if ( pinStateCheck( GPIO_IN_REG_VAL,GPIO_IN1_REG_VAL, VFD_SA) ) segPins |= 0b0000000000001 ;
 if ( pinStateCheck( GPIO_IN_REG_VAL,GPIO_IN1_REG_VAL, VFD_SB) ) segPins |= 0b0000000000010 ;
 if ( pinStateCheck( GPIO_IN_REG_VAL,GPIO_IN1_REG_VAL, VFD_SC) ) segPins |= 0b0000000000100 ;
@@ -114,7 +163,43 @@ if ( pinStateCheck( GPIO_IN_REG_VAL,GPIO_IN1_REG_VAL, VFD_SI) ) segPins |= 0b000
 if ( pinStateCheck( GPIO_IN_REG_VAL,GPIO_IN1_REG_VAL, VFD_SJ) ) segPins |= 0b0001000000000 ;
 if ( pinStateCheck( GPIO_IN_REG_VAL,GPIO_IN1_REG_VAL, VFD_SK) )  segPins |= 0b0010000000000 ;
 if ( pinStateCheck( GPIO_IN_REG_VAL,GPIO_IN1_REG_VAL, VFD_SL) )  segPins |= 0b0100000000000 ;
+*/
 
+esp_task_wdt_reset();
+//digitalWrite(CLKINH, LOW);
+//digitalWrite(CLEARI, HIGH);
+//digitalWrite(VFD_DATIN, LOW);
+
+
+//delay(1);
+digitalWrite(VFD_CLK, LOW);
+digitalWrite(VFD_PE, HIGH);
+digitalWrite(VFD_CLK, HIGH);
+delay(1);
+digitalWrite(VFD_CLKINH, LOW);
+
+CIPULSE();
+   
+   tempSegPins = shiftIn(VFD_DATIN, VFD_CLK, LSBFIRST) << 8; // Read shift 8 bits of data in from 74HC165
+   tempSegPins |= shiftIn(VFD_DATIN, VFD_CLK, LSBFIRST) ; // Read shift 8 bits of data in from 74HC165
+
+//Wiring Order - (SI)(SJ)(SK)(SL)(SH)(SG)(SF)(SE)(SA)(SB)(SC)(SD)
+
+   segPins = 0;
+   if (tempSegPins & 0b000000001000) segPins |= 1 << 0; // (SA)
+   if (tempSegPins & 0b000000000100) segPins |= 1 << 1; // (SB)
+   if (tempSegPins & 0b000000000010) segPins |= 1 << 2; // Actual A  (SC)
+   if (tempSegPins & 0b000000000001) segPins |= 1 << 3; // Actual B  (SD)
+   if (tempSegPins & 0b000000010000) segPins |= 1 << 4; // Actual C  (SE)
+   if (tempSegPins & 0b000000100000) segPins |= 1 << 5; // Actual D  (SF)
+   if (tempSegPins & 0b000001000000) segPins |= 1 << 6; // Actual E  (SG)
+   if (tempSegPins & 0b000010000000) segPins |= 1 << 7; // Actual F  (SH)
+   if (tempSegPins & 0b100000000000) segPins |= 1 << 8; // Actual G  (SI)
+   if (tempSegPins & 0b010000000000) segPins |= 1 << 9; //   (SJ)
+   if (tempSegPins & 0b001000000000) segPins |= 1 << 10; //  (SK)
+   if (tempSegPins & 0b000100000000) segPins |= 1 << 11; //  (SL)
+
+esp_task_wdt_reset();
 
      if (gridPins & 0b01)       { vfdChar[0] = segPins; beginFrameFlag = 0;}
 else if (beginFrameFlag); // If beginFrameFlag stop assessing pins
@@ -289,31 +374,43 @@ void setup() {
 
   Serial.begin(115200);
 
-  gpio_pad_select_gpio(VFD_SA);
-  gpio_pad_select_gpio(VFD_SB);
-  gpio_pad_select_gpio(VFD_SC);
-  gpio_pad_select_gpio(VFD_SD);
-  gpio_pad_select_gpio(VFD_SE);
-  gpio_pad_select_gpio(VFD_SF);
-  gpio_pad_select_gpio(VFD_SG);
-  gpio_pad_select_gpio(VFD_SH);
-  gpio_pad_select_gpio(VFD_SI);
-  gpio_pad_select_gpio(VFD_SJ);
-  gpio_pad_select_gpio(VFD_SK);
-  gpio_pad_select_gpio(VFD_SL);  
+  //gpio_pad_select_gpio(VFD_SA);
+  //gpio_pad_select_gpio(VFD_SB);
+  //gpio_pad_select_gpio(VFD_SC);
+  //gpio_pad_select_gpio(VFD_SD);
+  //gpio_pad_select_gpio(VFD_SE);
+  //gpio_pad_select_gpio(VFD_SF);
+  //gpio_pad_select_gpio(VFD_SG);
+  //gpio_pad_select_gpio(VFD_SH);
+  //gpio_pad_select_gpio(VFD_SI);
+  //gpio_pad_select_gpio(VFD_SJ);
+  //gpio_pad_select_gpio(VFD_SK);
+  //gpio_pad_select_gpio(VFD_SL); 
 
-  pinMode(VFD_SA, INPUT);
-  pinMode(VFD_SB, INPUT);
-  pinMode(VFD_SC, INPUT);
-  pinMode(VFD_SD, INPUT);
-  pinMode(VFD_SE, INPUT);
-  pinMode(VFD_SF, INPUT);
-  pinMode(VFD_SG, INPUT);
-  pinMode(VFD_SH, INPUT);
-  pinMode(VFD_SI, INPUT);
-  pinMode(VFD_SJ, INPUT);
-  pinMode(VFD_SK, INPUT);
-  pinMode(VFD_SL, INPUT);
+
+  gpio_pad_select_gpio(VFD_DATIN);
+  gpio_pad_select_gpio(VFD_PE);
+  gpio_pad_select_gpio(VFD_CLK);
+   gpio_pad_select_gpio(VFD_CLKINH);
+  gpio_pad_select_gpio(VFD_CLR); 
+
+   pinMode(VFD_DATIN, INPUT);
+   pinMode(VFD_PE, OUTPUT);
+   pinMode(VFD_CLK, OUTPUT);
+   pinMode(VFD_CLR, OUTPUT);
+   pinMode(VFD_CLKINH, OUTPUT);
+ // pinMode(VFD_SA, INPUT);
+ // pinMode(VFD_SB, INPUT);
+ // pinMode(VFD_SC, INPUT);
+ // pinMode(VFD_SD, INPUT);
+ // pinMode(VFD_SE, INPUT);
+ // pinMode(VFD_SF, INPUT);
+ // pinMode(VFD_SG, INPUT);
+ // pinMode(VFD_SH, INPUT);
+ // pinMode(VFD_SI, INPUT);
+ // pinMode(VFD_SJ, INPUT);
+ // pinMode(VFD_SK, INPUT);
+ // pinMode(VFD_SL, INPUT);
   
   pinMode(VFD_G1, INPUT);
   pinMode(VFD_G2, INPUT);
@@ -325,8 +422,10 @@ void setup() {
   pinMode(VFD_G8, INPUT);
 
 
+  esp_task_wdt_init(3, false);
 
-  //REG_WRITE(GPIO_FUNC39_IN_SEL_CFG_REG,0);
+  
+  REG_WRITE(GPIO_FUNC39_IN_SEL_CFG_REG,0);
 
   attachInterrupt(VFD_G1, screenCapture, RISING);
   attachInterrupt(VFD_G2, screenCapture, RISING);
@@ -339,6 +438,10 @@ void setup() {
 
 
   pinMode(VCR_IR, OUTPUT);
+
+  //CONFIG_INT_WDT_CHECK_CPU1=0
+
+  //CONFIG_ESP_INT_WDT_TIMEOUT_MS = 500;
 }
 /*
   //create a task that will be executed in the Task1code() function, with priority 1 and executed on core 0
@@ -370,20 +473,7 @@ void setup() {
 
 
 
-bool pinStateCheck(uint32_t GPIO_IN_REG_VAL, uint32_t GPIO_IN1_REG_VAL, uint8_t pinCheck){
 
-if (pinCheck < 32){
- if ( (GPIO_IN_REG_VAL >> pinCheck) & (uint32_t)1  != 0) 
- 
-  return true; }
-else{ 
- if ( ((GPIO_IN1_REG_VAL >> (pinCheck - 32)) & (uint32_t)1 ) != 0) 
-   
-  return true; }
- 
-return false;
-  
-}
 
 
 void sevenSegmentPrint(int currentLine){
@@ -408,7 +498,7 @@ bool seg_L;
   //bool seg_A = 
 
 if(currentLine == 0){  
-      Serial.print(vfdChar[7]); Serial.print(" "); Serial.print(vfdChar[6]); Serial.print(" "); 
+      Serial.print(vfdChar[7],BIN); Serial.print(" "); Serial.print(vfdChar[6],BIN); Serial.print(" "); 
       Serial.print(vfdChar[5]); Serial.print(" "); Serial.print(vfdChar[4]); Serial.print(" ");
       Serial.print(vfdChar[3]); Serial.print(" "); Serial.print(vfdChar[2]); Serial.print(" ");
       Serial.print(vfdChar[1]); Serial.print(" "); Serial.println(vfdChar[0]); }
