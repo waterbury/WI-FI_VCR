@@ -23,6 +23,7 @@
 */
 
 #include <esp_task_wdt.h>
+//#include 
 
 
 TaskHandle_t Task1;
@@ -498,10 +499,32 @@ bool seg_L;
   //bool seg_A = 
 
 if(currentLine == 0){  
-      Serial.print(vfdChar[7],BIN); Serial.print(" "); Serial.print(vfdChar[6],BIN); Serial.print(" "); 
-      Serial.print(vfdChar[5]); Serial.print(" "); Serial.print(vfdChar[4]); Serial.print(" ");
-      Serial.print(vfdChar[3]); Serial.print(" "); Serial.print(vfdChar[2]); Serial.print(" ");
-      Serial.print(vfdChar[1]); Serial.print(" "); Serial.println(vfdChar[0]); }
+      Serial.print(vfdChar[7],BIN); Serial.print(" "); Serial.print(vfdChar[6],BIN); Serial.print(" "); Serial.print(vfdChar[5]);     Serial.print(" ");
+      Serial.print(vfdChar[4]);     Serial.print(" "); Serial.print(vfdChar[3]);     Serial.print(" "); Serial.print(vfdChar[2]);     Serial.print(" ");
+      Serial.print(vfdChar[1]);     Serial.print(" "); Serial.println(vfdChar[0]); 
+
+      //Grid-8
+      if (vfdChar[7] & 0b01) Serial.print("C");      else Serial.print(" ");    Serial.print(" ");  //SegSA
+      if (vfdChar[7] & 0b10) Serial.print("SAT");    else Serial.print("   ");  Serial.print(" ");  //SegSB
+      //Grid-7
+      if (vfdChar[6] & 0b01) Serial.print("<|");     else Serial.print("  ");   Serial.print(" ");  //SegSA
+      //Grid-6
+      if (vfdChar[5] & 0b0001) Serial.print("|>");   else Serial.print("  ");   Serial.print(" ");  //SegSA      
+      if (vfdChar[5] & 0b0010) Serial.print("II");   else Serial.print("  ");   Serial.print(" ");  //SegSB    
+      if (vfdChar[5] & 0b1000) Serial.print("TIME"); else Serial.print("    "); Serial.print(" ");  //SegSD
+      //Grid-5
+      if (vfdChar[4] & 0b01) Serial.print("REC");    else Serial.print("   ");  Serial.print(" ");  //SegSA     
+      //Grid-4
+      if (vfdChar[3] & 0b01) Serial.print("AM");     else Serial.print("  ");   Serial.print(" ");  //SegSA     
+      //Grid-3
+      if (vfdChar[2] & 0b01) Serial.print("VCR");    else Serial.print("   ");  Serial.print(" ");  //SegSA     
+      //Grid-2
+      if (vfdChar[1] & 0b01) Serial.print("L");      else Serial.print(" ");  //SegSA  
+      if (vfdChar[1] & 0b10) Serial.print("R");      else Serial.print(" ");  Serial.print(" "); //SegSB 
+      //Grid-1
+      if (vfdChar[0] & 0b01) Serial.print("o-o");    else Serial.print("   "); Serial.println("");  //SegSA  
+      
+      }
 	  
 //render from top left to bottom right; ie currenLine 0 is top
   for (i=7;i>=0;i--){
@@ -521,7 +544,7 @@ if(currentLine == 0){
     seg_G = (vfdChar[i] &       0b100000000);
     seg_H = (vfdChar[i] &      0b1000000000);
 	
-	segSK = (vfdChar[i] &     0b10000000000);
+	  segSK = (vfdChar[i] &     0b10000000000);
 
 	Serial.print(" ");
 
@@ -532,34 +555,85 @@ if(currentLine == 0){
 			Serial.print(" ");
 	}
 	Serial.print(" ");
-    
 
-    for(j=0;j<5;j++){
-     if (currentLine == 0){
-       if( (j == 1 || j == 2 | j == 3) && seg_A  ) Serial.print('I'); 
+      if (i == 1){ 
+      if( (currentLine == 2 || currentLine == 4) && segSK ) Serial.print('*'); 
+       else Serial.print(" "); 
+       
+       Serial.print(" ");
+       }
+    
+    //Numerals are 5 characters wide
+     for(j=0;j<5;j++){
+
+        //Third characater is not standard
+        if (i != 5){ 
+         if (currentLine == 0){
+           if( (j == 1 || j == 2 | j == 3) && seg_A  ) Serial.print('I'); 
+           else Serial.print(" "); }
+         else if (currentLine == 1 || currentLine == 2){
+           if( (j == 0) && seg_F  ) Serial.print('I'); 
+           else if( (j == 4) && seg_B  ) Serial.print('I');
+           else Serial.print(" "); }
+         else if (currentLine == 3){
+           if( (j == 1 || j == 2 | j == 3) && seg_G  ) Serial.print('I'); 
+           else Serial.print(" "); }  
+         else if (currentLine == 4 || currentLine == 5){
+           if( (j == 0) && seg_E  ) Serial.print('I'); 
+           else if( (j == 4) && seg_C  ) Serial.print('I');
+           else Serial.print(" "); }
+         else if (currentLine == 6){
+           if( (j == 1 || j == 2 | j == 3) && seg_D  ) Serial.print('I'); 
+           else Serial.print(" "); }
+         else
+          Serial.print(' ');      
+        }
+        else{
+         if (currentLine == 0 || currentLine == 1 || currentLine == 2 || currentLine == 4 || currentLine == 5 || currentLine == 6 ){ Serial.print(" "); }
+         else if (currentLine == 3){
+           if( (j == 1 || j == 2 | j == 3) && seg_A  ) Serial.print('I'); 
+           else Serial.print(" "); }
+         else
+          Serial.print(' ');         
+        }
+     
+    }
+    Serial.print(' ');    
+
+    if (i == 4){ 
+      if( (currentLine == 2 || currentLine == 4) && segSK ) Serial.print('*'); 
        else Serial.print(" "); }
-     else if (currentLine == 1 || currentLine == 2){
-       if( (j == 0) && seg_F  ) Serial.print('I'); 
-       else if( (j == 4) && seg_B  ) Serial.print('I');
-       else Serial.print(" "); }
-     else if (currentLine == 3){
-       if( (j == 1 || j == 2 | j == 3) && seg_G  ) Serial.print('I'); 
-       else Serial.print(" "); }  
-     else if (currentLine == 4 || currentLine == 5){
-       if( (j == 0) && seg_E  ) Serial.print('I'); 
-       else if( (j == 4) && seg_C  ) Serial.print('I');
-       else Serial.print(" "); }
-     else if (currentLine == 6){
-       if( (j == 1 || j == 2 | j == 3) && seg_D  ) Serial.print('I'); 
-       else Serial.print(" "); }
-     else
-      Serial.print(' ');      
+      
     }
 
-    Serial.print(' ');    
-  }
+    
+
 
 Serial.println("");
+
+if(currentLine == 6){  
+
+      //Grid-8
+      if (vfdChar[7] & 0b100000000000) Serial.print("SAP");      else Serial.print("   ");    Serial.print(" ");  //SegSL      
+      //Grid-7
+      if (vfdChar[6] & 0b100000000000) Serial.print("ST");     else Serial.print("  ");   Serial.print(" ");  //SegSL
+      //Grid-6
+      if (vfdChar[5] & 0b100000000000) Serial.print("OFF");   else Serial.print("   ");   Serial.print(" ");  //SegSL  
+      //Grid-5
+      if (vfdChar[4] & 0b100000000000) Serial.print("REM");    else Serial.print("   ");  Serial.print(" ");  //SegSL     
+      //Grid-4
+      if (vfdChar[3] & 0b100000000000) Serial.print("PM");     else Serial.print("  ");   Serial.print(" ");  //SegSL     
+      //Grid-3
+      if (vfdChar[2] & 0b010000000000) Serial.print("SP");    else Serial.print("  ");  Serial.print(" ");  //SegSK     
+      if (vfdChar[2] & 0b100000000000) Serial.print("SP");    else Serial.print("  ");  Serial.print(" ");  //SegSL     
+      //Grid-2
+      if (vfdChar[1] & 0b100000000000) Serial.print("LP");    else Serial.print("  ");  Serial.print(" "); //SegSL
+      //Grid-1
+      if (vfdChar[0] & 0b100000000000) Serial.print("EP");    else Serial.print("  "); Serial.println("");  //SegSL  
+      
+      }
+
+
   
 }
 
